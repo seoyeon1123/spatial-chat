@@ -1,0 +1,61 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="head" cx="0.42" cy="0.38" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.7" stop-color="#fdfbf8"/>
+      <stop offset="1" stop-color="#f0ebe4"/>
+    </radialGradient>
+    <radialGradient id="earg" cx="0.5" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f0ebe4"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#5b3fae" flood-opacity="0.20"/>
+    </filter>
+  </defs>
+
+  <!-- 연보라 단색 배경 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" fill="#cdb9ff"/>
+
+  <!-- 말풍선 (토끼 왼쪽 아래, 토끼에서 나오는 느낌) -->
+  <g filter="url(#soft)">
+    <rect x="120" y="690" width="300" height="180" rx="74" fill="#ffffff"/>
+    <!-- 꼬리: 말풍선 오른쪽 위에서 토끼 쪽으로 -->
+    <path d="M360 712 q40 -70 120 -96 q-58 60 -64 132 Z" fill="#ffffff"/>
+  </g>
+  <g fill="#b9a3ff">
+    <circle cx="200" cy="780" r="22"/>
+    <circle cx="270" cy="780" r="22"/>
+    <circle cx="340" cy="780" r="22"/>
+  </g>
+
+  <!-- 토끼 -->
+  <g filter="url(#soft)">
+    <!-- 귀 -->
+    <g>
+      <path d="M455 470 C 425 300, 410 150, 470 120 C 525 100, 540 270, 540 430 Z" fill="url(#earg)"/>
+      <path d="M610 470 C 645 300, 665 150, 605 120 C 548 100, 532 270, 540 430 Z" fill="url(#earg)"/>
+      <path d="M468 430 C 452 320, 446 215, 478 198 C 510 192, 514 318, 512 410 Z" fill="#ffb3b0"/>
+      <path d="M600 430 C 620 320, 626 215, 594 198 C 562 192, 558 318, 562 410 Z" fill="#ffb3b0"/>
+    </g>
+    <!-- 얼굴 -->
+    <ellipse cx="535" cy="560" rx="218" ry="196" fill="url(#head)"/>
+  </g>
+
+  <!-- 눈 -->
+  <ellipse cx="455" cy="565" rx="26" ry="34" fill="#241f2b"/>
+  <ellipse cx="615" cy="565" rx="26" ry="34" fill="#241f2b"/>
+  <circle cx="447" cy="552" r="9" fill="#ffffff"/>
+  <circle cx="607" cy="552" r="9" fill="#ffffff"/>
+
+  <!-- 볼 -->
+  <ellipse cx="392" cy="618" rx="34" ry="24" fill="#ffc6c2" opacity="0.9"/>
+  <ellipse cx="678" cy="618" rx="34" ry="24" fill="#ffc6c2" opacity="0.9"/>
+
+  <!-- 코 -->
+  <path d="M535 600 q26 0 26 18 q0 18 -26 26 q-26 -8 -26 -26 q0 -18 26 -18 Z" fill="#f29b9b"/>
+  <!-- 입 + 이빨 -->
+  <path d="M535 626 q0 26 -28 30 M535 626 q0 26 28 30" fill="none" stroke="#9a6b6b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M520 650 q15 22 30 0 Z" fill="#ff7a8a"/>
+  <rect x="528" y="650" width="14" height="14" rx="4" fill="#ffffff"/>
+</svg>

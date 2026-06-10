@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.googleapis.com; style-src 'self' 'unsafe-inline';">
+<title>SpatialChat</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== 로비(입장) : 이 창은 클릭을 받아야 하므로 인터랙션 영역 ===== -->
+<div id="lobby" class="interactive">
+  <div class="lobby-card">
+    <button id="lobbyClose" class="closeX" title="닫기">×</button>
+    <h1>공간에 입장</h1>
+    <p class="sub">캐릭터와 닉네임을 고르세요</p>
+
+    <div class="char-grid" id="charGrid"></div>
+    <input id="nick" placeholder="닉네임" maxlength="10" autocomplete="off">
+
+    <div class="room-row">
+      <input id="roomCode" placeholder="초대 코드 (비우면 새 공간 생성)" maxlength="12" autocomplete="off">
+    </div>
+
+    <button id="enter" disabled>입장하기</button>
+    <p class="err" id="lobbyErr"></p>
+  </div>
+</div>
+
+<!-- ===== 오버레이(공간) ===== -->
+<div id="overlay" class="hidden">
+  <!-- 상단 미니 바 : 인터랙션 영역 -->
+  <div class="topbadge interactive" id="topbadge">
+    <span class="dot"></span>
+    <span id="roomLabel">공간</span>
+    <span class="avs" id="avs"></span>
+    <button class="mini" id="copyInvite">초대코드 복사</button>
+    <button class="mini ghost" id="quitBtn">나가기</button>
+  </div>
+
+  <!-- 캐릭터들이 그려지는 레이어 (배경은 클릭 통과) -->
+  <div id="stage"></div>
+
+  <!-- 입력창 : 인터랙션 영역 -->
+  <div id="inputBox" class="interactive"><input id="chatInput" placeholder="입력 후 Enter" maxlength="80" autocomplete="off"></div>
+
+  <div class="hint">내 캐릭터는 드래그로 이동 · 클릭하면 입력 · ⌘/Ctrl+Shift+Space 로 숨김</div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

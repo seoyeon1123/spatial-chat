@@ -1,0 +1,45 @@
+{
+  "name": "spatial-chat",
+  "version": "0.1.0",
+  "description": "바탕화면 위에 떠다니는 공간형 실시간 채팅 오버레이 앱",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "firebase": "^10.12.0"
+  },
+  "build": {
+    "appId": "com.example.spatialchat",
+    "productName": "SpatialChat",
+    "files": ["**/*"],
+    "directories": { "buildResources": "build" },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SpatialChat"
+    },
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    }
+  }
+}
