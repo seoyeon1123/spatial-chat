@@ -1,10 +1,11 @@
 // 렌더러: UI + Firebase 실시간 동기화
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, onValue, update, remove,
-  onDisconnect, runTransaction, push, get, serverTimestamp,
+  getDatabase, ref, onValue, update, remove, set,
+  onDisconnect, push, get, serverTimestamp,
   query, limitToLast
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const MAX_MEMBERS = 5;
@@ -16,13 +17,20 @@ const CLEANUP_TIMEOUT_MS = 1500;          // 정리가 느려도 종료가 막�
 const CHARS = ["🐱","🐶","🦊","🐰","🐻","🐼","🐸","🦁","🐧","🐯","🐵","🐹"];
 
 // ---------- Firebase ----------
-let db = null;
+let db = null, auth = null, authReady = null;
 try {
   const fbApp = initializeApp(firebaseConfig);
   db = getDatabase(fbApp);
+  auth = getAuth(fbApp);
+  // 익명 로그인. 사용자는 로그인한 줄 모르지만, 보안 규칙이 "본인 노드만 쓰기"를
+  // 강제할 수 있게 되고 로그인하지 않은 접근은 전부 거부된다.
+  // 세션이 브라우저 저장소에 남아 다시 켜도 같은 uid를 받는다.
+  authReady = signInAnonymously(auth).then((c) => c.user.uid);
 } catch (e) {
   console.error("Firebase 초기화 실패:", e);
+  authReady = Promise.reject(e);
 }
+function ensureAuth() { return authReady; }
 
 // ---------- 상태 ----------
 let myChar = null, myNick = "", roomCode = "", myId = null;
@@ -164,9 +172,11 @@ function stopWatchingRoom() {
   if (unwatchRoom) { unwatchRoom(); unwatchRoom = null; }
 }
 
-function watchRoom(code) {
+async function watchRoom(code) {
   stopWatchingRoom();
   if (!db) return;
+  try { await ensureAuth(); } catch (e) { console.error("로그인 실패:", e); }
+  if (roomCodeEl.value !== code) return;      // 대기 중에 코드가 바뀌었으면 버린다
   const r = ref(db, `rooms/${code}/members`);
   unwatchRoom = onValue(r, (snap) => {
     const members = snap.val() || {};
@@ -302,37 +312,54 @@ async function join() {
   enterBtn.disabled = true; lobbyErr.textContent = "연결 중…";
   stopWatchingRoom();       // 로비 구독 해제 — 입장하면 오버레이가 다시 구독한다
 
+  // 멤버 id로 익명 계정의 uid를 그대로 쓴다.
+  // 보안 규칙이 rooms/$room/members/$member 에서 $member === auth.uid 를 요구하므로,
+  // 남의 캐릭터를 옮기거나 남의 이름으로 말하는 것이 서버에서 차단된다.
+  try {
+    myId = await withTimeout(ensureAuth(), "로그인 실패");
+  } catch (e) {
+    console.error(e);
+    lobbyErr.textContent = "Firebase 로그인 실패 — 콘솔에서 익명 인증을 켜주세요";
+    enterBtn.disabled = false; return;
+  }
+
   membersRef = ref(db, `rooms/${roomCode}/members`);
-  myId = push(membersRef).key;
+  myRef = ref(db, `rooms/${roomCode}/members/${myId}`);
 
   const newMember = { char: myChar, name: myNick, x: myPos.x, y: myPos.y, msg: "", msgAt: 0 };
 
-  // 로비에서 미리 걸렀어도, 커밋 직전에 남이 채갔을 수 있으므로 트랜잭션에서 최종 판정한다.
-  let abortReason = null;
-  try {
-    const tx = runTransaction(membersRef, (members) => {
-      members = members || {};
-      const list = Object.values(members);
-      if (mode === "join" && list.length === 0) { abortReason = "gone"; return; }
-      if (list.length >= MAX_MEMBERS) { abortReason = "full"; return; }
-      if (list.some((m) => m.char === myChar)) { abortReason = "char"; return; }
-      abortReason = null;
-      members[myId] = newMember;
-      return members;
-    });
-    const res = await withTimeout(tx, "timeout");
+  // 규칙이 남의 노드 쓰기를 막으므로 컬렉션 전체를 쓰는 트랜잭션은 더 쓸 수 없다.
+  // 대신 확인 → 내 노드만 쓰기 → 사후 확인 순으로 처리하고, 동시 입장이 겹치면
+  // uid 사전순으로 뒤인 쪽이 물러난다(양쪽이 같은 판정을 내리므로 한 명만 남는다).
+  function bail(msg, resetChar) {
+    lobbyErr.textContent = msg;
+    if (resetChar) { myChar = null; paintChars(); }
+    if (mode === "join") watchRoom(roomCode);
+    enterBtn.disabled = false;
+  }
 
-    if (!res.committed) {
-      lobbyErr.textContent =
-        abortReason === "char" ? "그 캐릭터를 방금 다른 분이 선택했어요. 다시 골라주세요"
-        : abortReason === "gone" ? "그 사이에 공간이 사라졌어요"
-        : `정원이 가득 찼어요 (최대 ${MAX_MEMBERS}명)`;
-      if (abortReason === "char") { myChar = null; paintChars(); }
-      if (mode === "join") watchRoom(roomCode);     // 다시 지켜보기
-      enterBtn.disabled = false; return;
+  try {
+    const before = (await withTimeout(get(membersRef), "방 확인 실패")).val() || {};
+    const others = Object.keys(before).filter((k) => k !== myId);
+    if (mode === "join" && others.length === 0) return bail("그 사이에 공간이 사라졌어요");
+    if (others.length >= MAX_MEMBERS) return bail(`정원이 가득 찼어요 (최대 ${MAX_MEMBERS}명)`);
+    if (others.some((k) => before[k].char === myChar)) {
+      return bail("그 캐릭터를 방금 다른 분이 선택했어요. 다시 골라주세요", true);
     }
-    // 내가 방의 첫 사람인가? (= 직전 세션이 완전히 끝났다는 뜻)
-    iAmFirst = Object.keys(res.snapshot.val() || {}).length === 1;
+    iAmFirst = others.length === 0;
+
+    await withTimeout(set(myRef, newMember), "입장 실패");
+
+    // 사후 확인 — 같은 순간에 들어온 사람과 겹쳤는지
+    const after = (await withTimeout(get(membersRef), "확인 실패")).val() || {};
+    const keys = Object.keys(after).sort();
+    const dupe = keys.some((k) => k !== myId && after[k].char === myChar && k < myId);
+    const over = keys.length > MAX_MEMBERS && keys.indexOf(myId) >= MAX_MEMBERS;
+    if (dupe || over) {
+      await remove(myRef);
+      return bail(dupe ? "그 캐릭터를 방금 다른 분이 선택했어요. 다시 골라주세요"
+                       : `정원이 가득 찼어요 (최대 ${MAX_MEMBERS}명)`, dupe);
+    }
   } catch (e) {
     console.error("join 실패:", e);
     lobbyErr.textContent =
@@ -344,7 +371,6 @@ async function join() {
 
   if (mode === "create") toast(`초대코드 ${roomCode} — 상단에서 복사할 수 있어요`, 4000);
 
-  myRef = ref(db, `rooms/${roomCode}/members/${myId}`);
   msgsRef = ref(db, `rooms/${roomCode}/messages`);
   onDisconnect(myRef).remove();
 
@@ -696,6 +722,7 @@ function withTimeout(p, label, ms = 10000) {
 
 // 살아 있는 방인가? (멤버가 한 명이라도 있어야 방이다 — 마지막 사람이 나가면 소멸)
 async function roomExists(code) {
+  await ensureAuth();
   const snap = await get(ref(db, `rooms/${code}/members`));
   return snap.exists() && Object.keys(snap.val() || {}).length > 0;
 }
