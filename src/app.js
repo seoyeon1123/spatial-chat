@@ -766,20 +766,47 @@ filePick.addEventListener("change", () => {
 
 // ── 끌어다 놓기 ──
 // 오버레이는 빈 곳에서 클릭이 통과하므로, 드래그가 들어오면 잠시 통과를 끄고
-// 화면 전체를 받는 영역으로 바꾼다. 드래그가 끝나면 원래대로 돌린다.
-const dropZone = $("#dropZone");
+// 화면 전체를 받는다. 다만 화면을 어둡게 덮지는 않는다 — 바탕화면 위에 떠 있는
+// 앱이라 그건 과하다. 대신 내 캐릭터 옆 말풍선 자리에 목표점을 띄운다.
+const dropBubble = $("#dropBubble");
 let dragDepth = 0;
-function showDrop(on) {
-  dropZone.classList.toggle("hidden", !on);
-  if (on) setIgnore(false);
+
+function placeDropBubble() {
+  const me = actorEls[myId];
+  if (!me) return false;
+  dropBubble.classList.remove("hidden");
+  const r = me.el.getBoundingClientRect();
+  const b = dropBubble.getBoundingClientRect();
+  let left = r.left + r.width / 2;
+  left = Math.min(Math.max(left, b.width / 2 + EDGE), window.innerWidth - b.width / 2 - EDGE);
+  let top = r.bottom + 8;
+  if (top + b.height > window.innerHeight - EDGE) top = r.top - b.height - 8;
+  top = Math.max(EDGE, Math.min(top, window.innerHeight - b.height - EDGE));
+  dropBubble.style.left = left + "px";
+  dropBubble.style.top = top + "px";
+  return true;
 }
+
+function showDrop(on) {
+  if (on) { setIgnore(false); if (!placeDropBubble()) dropBubble.classList.add("hidden"); }
+  else { dropBubble.classList.add("hidden"); dropBubble.classList.remove("hot"); if (!inputOpen) setIgnore(true); }
+}
+
 document.addEventListener("dragenter", (e) => {
   if (!msgsRef) return;
   e.preventDefault();
   dragDepth++;
   showDrop(true);
 });
-document.addEventListener("dragover", (e) => { if (msgsRef) e.preventDefault(); });
+document.addEventListener("dragover", (e) => {
+  if (!msgsRef) return;
+  e.preventDefault();
+  // 목표점 위에 올라오면 색이 찬다
+  const b = dropBubble.getBoundingClientRect();
+  const on = e.clientX >= b.left - 24 && e.clientX <= b.right + 24 &&
+             e.clientY >= b.top - 24 && e.clientY <= b.bottom + 24;
+  dropBubble.classList.toggle("hot", on);
+});
 document.addEventListener("dragleave", () => {
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) showDrop(false);

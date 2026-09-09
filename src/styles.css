@@ -268,16 +268,20 @@ html, body {
 .upfill { position:absolute; left:0; top:0; bottom:0; width:0%; background:#7c6cff; transition:width .15s; }
 .uptext { position:relative; font-size:11px; color:#fff; }
 
-/* 끌어다 놓기 */
-.dropzone {
-  position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
-  background:rgba(15,15,25,.5); backdrop-filter:blur(3px);
+/* 끌어다 놓기 — 말풍선 자리에 뜨는 작은 목표점 */
+.dropbubble {
+  position:absolute; z-index:60; transform:translate(-50%,0);
+  display:flex; align-items:center; gap:7px;
+  padding:9px 15px; border-radius:14px;
+  border:2px dashed #7c6cff; background:rgba(255,255,255,.96);
+  color:#4a3fb8; font-size:13px; font-weight:600; white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  animation:dropin .16s cubic-bezier(.2,1.5,.4,1);
+  pointer-events:none;
 }
-.dropbox {
-  border:2.5px dashed #7c6cff; border-radius:18px; padding:34px 46px;
-  background:rgba(30,30,46,.92); color:#fff; font-size:15px; font-weight:600;
-  box-shadow:0 18px 48px rgba(0,0,0,.5);
-}
+.dropbubble.hot { background:#7c6cff; color:#fff; border-style:solid; transform:translate(-50%,0) scale(1.06); }
+.dropbubble-ico { font-size:16px; }
+@keyframes dropin { from { opacity:0; transform:translate(-50%,6px) scale(.9); } }
 
 /* 크게 보기 */
 .viewer {
