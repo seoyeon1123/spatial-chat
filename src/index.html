@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.googleapis.com; style-src 'self' 'unsafe-inline';">
+  content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.googleapis.com; img-src 'self' data: blob: https://firebasestorage.googleapis.com; style-src 'self' 'unsafe-inline';">
 <title>SpatialChat</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -69,6 +69,7 @@
     <span id="roomLabel">공간</span>
     <span class="avs" id="avs"></span>
     <button class="mini" id="copyInvite">초대코드 복사</button>
+    <button class="mini ghost" id="imgBtn" title="이미지 보내기 (⌘V로 붙여넣기도 됩니다)">이미지</button>
     <button class="mini ghost" id="logBtn">대화보기<span class="badge hidden" id="logBadge">0</span></button>
     <button class="mini ghost" id="quitBtn">나가기</button>
   </div>
@@ -90,6 +91,20 @@
   <div id="inputBox" class="interactive"><textarea id="chatInput" rows="1" placeholder="입력 후 Enter" maxlength="80" autocomplete="off" spellcheck="false"></textarea></div>
 
   <div class="hint" id="hint"></div>
+
+  <!-- 이미지 업로드 진행 -->
+  <div id="upBar" class="upbar hidden"><span class="upfill" id="upFill"></span><span class="uptext" id="upText">보내는 중…</span></div>
+
+  <!-- 파일 끌어다 놓기 안내 -->
+  <div id="dropZone" class="dropzone hidden"><div class="dropbox">여기에 놓으면 이미지를 보냅니다</div></div>
+
+  <!-- 이미지 크게 보기 -->
+  <div id="viewer" class="viewer hidden interactive">
+    <img id="viewerImg" alt="보낸 이미지">
+    <button id="viewerClose" class="viewer-x" title="닫기">×</button>
+  </div>
+
+  <input type="file" id="filePick" accept="image/*" hidden>
 </div>
 
 <!-- 종료 확인 등 짧은 안내 -->

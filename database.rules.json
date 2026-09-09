@@ -25,13 +25,24 @@
           ".write": "auth != null && !newData.exists()",
           "$msg": {
             ".write": "auth != null && (!data.exists() || !newData.exists())",
-            ".validate": "newData.hasChildren(['uid','char','name','text','at'])",
+            ".validate": "newData.hasChildren(['uid','char','name','at'])",
             "uid": { ".validate": "newData.val() == auth.uid" },
             "char": { ".validate": "newData.isString() && newData.val().length <= 8" },
             "name": { ".validate": "newData.isString() && newData.val().length <= 12" },
-            "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100" },
+            "text": { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "thumb": { ".validate": "newData.isString() && newData.val().length <= 90000" },
+            "imgId": { ".validate": "newData.isString() && newData.val().length <= 40" },
             "at": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
+          }
+        },
+
+        "images": {
+          ".read": "auth != null",
+          ".write": "auth != null && !newData.exists()",
+          "$img": {
+            ".write": "auth != null && (!data.exists() || !newData.exists())",
+            ".validate": "newData.isString() && newData.val().length <= 600000"
           }
         }
       }

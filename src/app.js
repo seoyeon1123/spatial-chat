@@ -11,6 +11,9 @@ import { firebaseConfig } from "./firebase-config.js";
 const MAX_MEMBERS = 5;
 const BUBBLE_MS = 4000;          // 말풍선 유지 시간
 const LOG_LIMIT = 100;           // 대화 기록에서 불러올 최근 메시지 수
+const THUMB_SIDE = 260;          // 목록·말풍선에 싣는 썸네일 긴 변(px)
+const FULL_SIDE = 1600;          // 크게 볼 때 쓰는 원본 긴 변(px)
+const FULL_MAX_BYTES = 400000;   // 압축 목표 — 이 아래로 떨어질 때까지 품질을 낮춘다
 const KEEP_MAX = 200;            // DB에 남겨둘 최대 메시지 수 (입장 시 초과분 삭제)
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;   // 24시간 지난 메시지는 입장 시 삭제
 const CLEANUP_TIMEOUT_MS = 1500;          // 정리가 느려도 종료가 막히지 않도록
@@ -34,7 +37,7 @@ function ensureAuth() { return authReady; }
 
 // ---------- 상태 ----------
 let myChar = null, myNick = "", roomCode = "", myId = null;
-let membersRef = null, myRef = null, msgsRef = null;
+let membersRef = null, myRef = null, msgsRef = null, imgsRef = null;
 let iAmFirst = false;                // 입장 시 방이 비어 있었는지
 // 정규화 좌표(0~1). 모두 같은 자리에 겹치지 않도록 조금씩 흩어서 시작한다.
 let myPos = { x: 0.3 + Math.random() * 0.4, y: 0.58 + Math.random() * 0.22 };
@@ -262,6 +265,7 @@ const QUIT_CONFIRM_MS = 2000;
 let quitArmedUntil = 0;
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  if (viewerOpen) { closeViewer(); return; }
   if (inputBox.style.display === "block") { hideInput(); return; }
   if (logOpen) { toggleLog(false); return; }
 
@@ -372,11 +376,13 @@ async function join() {
   if (mode === "create") toast(`초대코드 ${roomCode} — 상단에서 복사할 수 있어요`, 4000);
 
   msgsRef = ref(db, `rooms/${roomCode}/messages`);
+  imgsRef = ref(db, `rooms/${roomCode}/images`);   // 원본은 따로 둔다 (목록이 무거워지지 않게)
   onDisconnect(myRef).remove();
 
   // 방 청소: 첫 사람이면 이전 세션 잔재를 비우고(강제 종료·크래시 대비),
   // 아니면 오래되거나 넘치는 것만 솎아낸다. 실패해도 입장은 막지 않는다.
-  (iAmFirst ? remove(msgsRef) : pruneMessages()).catch((e) => console.warn("메시지 정리 실패:", e));
+  (iAmFirst ? Promise.all([remove(msgsRef), remove(imgsRef)]) : pruneMessages())
+    .catch((e) => console.warn("메시지 정리 실패:", e));
 
   startOverlay();
 }
@@ -407,6 +413,8 @@ function startOverlay() {
     b.textContent = "복사됨!"; setTimeout(() => (b.textContent = t), 1200);
   };
   $("#quitBtn").onclick = () => quitApp();
+
+  $("#imgBtn").onclick = () => filePick.click();
 
   // 대화 기록 패널
   $("#logBtn").onclick = () => toggleLog();
@@ -614,6 +622,147 @@ function sendMessage(text) {
   }, BUBBLE_MS);
 }
 
+// ====== 이미지 ======
+// 캡처 원본은 2~5MB라 그대로 실어 나를 수 없다. 캔버스로 줄이고 JPEG로 압축한다.
+async function shrink(file, maxSide, quality) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+  if (bmp.close) bmp.close();
+  return c.toDataURL("image/jpeg", quality);
+}
+
+// 목표 용량 아래로 떨어질 때까지 품질을 낮춘다
+async function shrinkToBudget(file, maxSide, budget) {
+  let q = 0.78, out = await shrink(file, maxSide, q);
+  while (out.length > budget && q > 0.35) {
+    q -= 0.12;
+    out = await shrink(file, maxSide, q);
+  }
+  return out;
+}
+
+const upBar = $("#upBar"), upFill = $("#upFill"), upText = $("#upText");
+function showUp(t, label) {
+  upBar.classList.remove("hidden");
+  upFill.style.width = Math.round(t * 100) + "%";
+  upText.textContent = label || "보내는 중…";
+}
+function hideUp() { upBar.classList.add("hidden"); upFill.style.width = "0%"; }
+
+let sending = false;
+async function sendImage(file) {
+  if (!msgsRef || !file || sending) return;
+  if (!/^image\//.test(file.type)) { toast("이미지 파일만 보낼 수 있어요"); return; }
+  sending = true;
+  try {
+    showUp(0.1, "이미지 줄이는 중…");
+    const [thumb, full] = await Promise.all([
+      shrinkToBudget(file, THUMB_SIDE, 60000),
+      shrinkToBudget(file, FULL_SIDE, FULL_MAX_BYTES),
+    ]);
+    showUp(0.6, "보내는 중…");
+
+    const id = push(msgsRef).key;
+    await set(ref(db, `rooms/${roomCode}/images/${id}`), full);
+    showUp(0.9, "보내는 중…");
+    await set(ref(db, `rooms/${roomCode}/messages/${id}`), {
+      uid: myId, char: myChar, name: myNick, text: "", thumb, imgId: id, at: serverTimestamp(),
+    });
+    hideUp();
+  } catch (e) {
+    console.error("이미지 전송 실패:", e);
+    hideUp();
+    toast("이미지를 보내지 못했어요");
+  } finally {
+    sending = false;
+  }
+}
+
+// 클립보드·파일선택·끌어다놓기에서 공통으로 첫 이미지를 집어낸다
+function pickImage(list) {
+  for (const f of list || []) if (f && /^image\//.test(f.type)) return f;
+  return null;
+}
+
+// ── 크게 보기 ──
+const viewer = $("#viewer"), viewerImg = $("#viewerImg");
+let viewerOpen = false;
+async function openViewer(imgId, fallback) {
+  viewerImg.src = fallback || "";
+  viewer.classList.remove("hidden");
+  viewerOpen = true;
+  setIgnore(false);
+  if (!imgId) return;
+  try {
+    const snap = await get(ref(db, `rooms/${roomCode}/images/${imgId}`));
+    if (snap.exists() && viewerOpen) viewerImg.src = snap.val();
+  } catch (e) { console.warn("원본 불러오기 실패:", e); }
+}
+function closeViewer() { viewer.classList.add("hidden"); viewerImg.src = ""; viewerOpen = false; }
+viewer.addEventListener("click", (e) => { if (e.target !== viewerImg) closeViewer(); });
+$("#viewerClose").onclick = (e) => { e.stopPropagation(); closeViewer(); };
+
+// 썸네일 엘리먼트 (클릭하면 원본)
+function thumbEl(m) {
+  const img = document.createElement("img");
+  img.className = "shot";
+  img.src = m.thumb;
+  img.alt = "보낸 이미지";
+  img.onclick = (e) => { e.stopPropagation(); openViewer(m.imgId, m.thumb); };
+  return img;
+}
+
+// ── 붙여넣기 ──
+document.addEventListener("paste", (e) => {
+  if (!msgsRef) return;
+  const f = pickImage(e.clipboardData && e.clipboardData.files);
+  if (!f) return;
+  e.preventDefault();
+  sendImage(f);
+});
+
+// ── 파일 선택 버튼 ──
+const filePick = $("#filePick");
+filePick.addEventListener("change", () => {
+  const f = pickImage(filePick.files);
+  if (f) sendImage(f);
+  filePick.value = "";
+});
+
+// ── 끌어다 놓기 ──
+// 오버레이는 빈 곳에서 클릭이 통과하므로, 드래그가 들어오면 잠시 통과를 끄고
+// 화면 전체를 받는 영역으로 바꾼다. 드래그가 끝나면 원래대로 돌린다.
+const dropZone = $("#dropZone");
+let dragDepth = 0;
+function showDrop(on) {
+  dropZone.classList.toggle("hidden", !on);
+  if (on) setIgnore(false);
+}
+document.addEventListener("dragenter", (e) => {
+  if (!msgsRef) return;
+  e.preventDefault();
+  dragDepth++;
+  showDrop(true);
+});
+document.addEventListener("dragover", (e) => { if (msgsRef) e.preventDefault(); });
+document.addEventListener("dragleave", () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) showDrop(false);
+});
+document.addEventListener("drop", (e) => {
+  if (!msgsRef) return;
+  e.preventDefault();
+  dragDepth = 0; showDrop(false);
+  const f = pickImage(e.dataTransfer && e.dataTransfer.files);
+  if (f) sendImage(f);
+  else toast("이미지 파일만 보낼 수 있어요");
+});
+
 // ====== 방 정리 ======
 // 입장할 때 한 번: 24시간이 지났거나 KEEP_MAX를 넘긴 오래된 메시지를 지운다.
 // push 키는 시간순이라 snapshot 순회 순서가 곧 오래된 순이다.
@@ -634,7 +783,13 @@ async function pruneMessages() {
   });
 
   const n = Object.keys(updates).length;
-  if (n) { await update(msgsRef, updates); console.log(`오래된 메시지 ${n}건 정리`); }
+  if (!n) return;
+  await update(msgsRef, updates);
+  // 딸린 원본 이미지도 같이 지운다 — 안 그러면 참조 없는 데이터만 남는다
+  const imgKills = {};
+  keys.forEach(([k, v]) => { if (updates[k] === null && v && v.imgId) imgKills[v.imgId] = null; });
+  if (Object.keys(imgKills).length) await update(imgsRef, imgKills);
+  console.log(`오래된 메시지 ${n}건 정리`);
 }
 
 // 나갈 때: 내 멤버를 지우고, 내가 마지막이었으면 방(기록 포함)을 통째로 지운다.
@@ -646,7 +801,7 @@ async function leaveRoom() {
   if (left === 0) {
     // rooms/$room 노드 자체엔 쓰기 권한이 없으므로 messages를 지운다.
     // members는 이미 비었고, RTDB는 자식이 없는 노드를 자동으로 없애므로 방이 통째로 사라진다.
-    await remove(msgsRef);
+    await Promise.all([remove(msgsRef), remove(imgsRef)]);
     console.log("마지막 사용자 — 방 삭제:", roomCode);
   }
 }
@@ -683,8 +838,18 @@ function scrollLogToBottom() { logBody.scrollTop = logBody.scrollHeight; }
 function renderLog(list) {
   // 새 메시지 개수 세기 (패널이 닫혀 있을 때만 뱃지 증가)
   let fresh = 0;
-  list.forEach((m) => { if (!seenMsgIds.has(m.id)) { seenMsgIds.add(m.id); fresh++; } });
+  const freshOnes = [];
+  list.forEach((m) => { if (!seenMsgIds.has(m.id)) { seenMsgIds.add(m.id); fresh++; freshOnes.push(m); } });
   if (logLoaded && !logOpen) { unread += fresh; paintBadge(); }
+
+  // 이미지는 members/msg를 타지 않으므로 여기서 직접 말풍선을 띄운다
+  if (logLoaded) {
+    freshOnes.forEach((m) => {
+      if (!m.thumb) return;
+      const a = actorEls[m.uid];
+      if (a) showImageBubble(a, m);
+    });
+  }
   logLoaded = true;
 
   const stick = logBody.scrollHeight - logBody.scrollTop - logBody.clientHeight < 40;
@@ -731,7 +896,9 @@ function renderLog(list) {
     const line = document.createElement("div");
     line.className = "log-line";
     const tx = document.createElement("div");
-    tx.className = "log-text"; tx.textContent = m.text;      // textContent → HTML 주입 차단
+    tx.className = "log-text";
+    if (m.thumb) { tx.classList.add("has-shot"); tx.appendChild(thumbEl(m)); }
+    else tx.textContent = m.text;                            // textContent → HTML 주입 차단
     const tm = document.createElement("div");
     tm.className = "log-time";
     tm.textContent = new Date(at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -768,6 +935,26 @@ function showBubble(a, text) {
 
   a._bubbleUntil = Date.now() + BUBBLE_MS;
 }
+// 이미지 말풍선 — 글자 말풍선과 같은 자리, 같은 수명
+function showImageBubble(a, m) {
+  const old = a.el.querySelector(".bubble");
+  if (old) old.remove();
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.appendChild(thumbEl(m));
+  const r = a.el.getBoundingClientRect();
+  if (r.right + 290 > window.innerWidth) b.classList.add("left");
+  a.el.appendChild(b);
+
+  const br = b.getBoundingClientRect();
+  let top = br.top;
+  if (br.bottom > window.innerHeight - EDGE) top = window.innerHeight - EDGE - br.height;
+  if (top < EDGE) top = EDGE;
+  if (Math.abs(top - br.top) > 0.5) { b.classList.add("pinned"); b.style.top = (top - r.top) + "px"; }
+
+  a._bubbleUntil = Date.now() + BUBBLE_MS * 1.8;   // 이미지는 조금 더 오래 둔다
+}
+
 function tickBubbles() {
   Object.values(actorEls).forEach((a) => {
     const b = a.el.querySelector(".bubble");
