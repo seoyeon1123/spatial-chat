@@ -1,6 +1,6 @@
 {
   "name": "spatial-chat",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "바탕화면 위에 떠다니는 공간형 실시간 채팅 오버레이 앱",
   "main": "main.js",
   "scripts": {
@@ -19,8 +19,15 @@
   "build": {
     "appId": "com.example.spatialchat",
     "productName": "SpatialChat",
-    "files": ["**/*"],
-    "directories": { "buildResources": "build" },
+    "files": [
+      "**/*",
+      "!node_modules/${/*}",
+      "!dist/${/*}",
+      "!scripts/${/*}"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
@@ -35,11 +42,22 @@
     },
     "mac": {
       "category": "public.app-category.social-networking",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": null
     },
     "linux": {
       "target": "AppImage",
       "icon": "build/icon.png"
-    }
+    },
+    "afterPack": "scripts/adhoc-sign.js"
   }
 }
