@@ -7,12 +7,49 @@
           ".write": true,
           "$member": {
             ".validate": "newData.hasChildren(['char','name','x','y'])",
-            "char": { ".validate": "newData.isString() && newData.val().length <= 8" },
-            "name": { ".validate": "newData.isString() && newData.val().length <= 12" },
-            "x": { ".validate": "newData.isNumber()" },
-            "y": { ".validate": "newData.isNumber()" },
-            "msg": { ".validate": "newData.isString() && newData.val().length <= 100" },
-            "msgAt": { ".validate": "newData.isNumber()" }
+            "char": {
+              ".validate": "newData.isString() && newData.val().length <= 8"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "x": {
+              ".validate": "newData.isNumber()"
+            },
+            "y": {
+              ".validate": "newData.isNumber()"
+            },
+            "msg": {
+              ".validate": "newData.isString() && newData.val().length <= 100"
+            },
+            "msgAt": {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        },
+        "messages": {
+          ".read": true,
+          ".write": true,
+          "$msg": {
+            ".validate": "newData.hasChildren(['uid','char','name','text','at'])",
+            "uid": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "char": {
+              ".validate": "newData.isString() && newData.val().length <= 8"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 12"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length <= 100"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }

@@ -64,6 +64,15 @@ app.whenReady().then(() => {
     win.isVisible() ? win.hide() : win.show();
   });
 
+  // 다른 앱에서 작업 중일 때 채팅 열기 (Cmd/Ctrl+Shift+Enter)
+  // Enter 단독은 전역으로 잡으면 다른 앱 입력을 다 가로채므로 조합키를 쓴다.
+  globalShortcut.register('CommandOrControl+Shift+Enter', () => {
+    if (!win) return;
+    if (!win.isVisible()) win.show();
+    win.focus();
+    win.webContents.send('focus-chat');
+  });
+
   // 디버그용 개발자도구 토글 (Cmd/Ctrl+Shift+I) — 에러 확인할 때
   globalShortcut.register('CommandOrControl+Shift+I', () => {
     if (!win) return;

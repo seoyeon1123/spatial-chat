@@ -13,18 +13,51 @@
 <div id="lobby" class="interactive">
   <div class="lobby-card">
     <button id="lobbyClose" class="closeX" title="닫기">×</button>
-    <h1>공간에 입장</h1>
-    <p class="sub">캐릭터와 닉네임을 고르세요</p>
 
-    <div class="char-grid" id="charGrid"></div>
-    <input id="nick" placeholder="닉네임" maxlength="10" autocomplete="off">
-
-    <div class="room-row">
-      <input id="roomCode" placeholder="초대 코드 (비우면 새 공간 생성)" maxlength="12" autocomplete="off">
+    <!-- 1단계: 무엇을 할지 -->
+    <div class="step" id="step1">
+      <h1>공간 채팅</h1>
+      <p class="sub">새 공간을 만들거나, 초대 코드로 들어가세요</p>
+      <div class="pick-row">
+        <button class="pick-card" id="goCreate">
+          <span class="pick-ico">✨</span>
+          <span class="pick-t">방 만들기</span>
+          <span class="pick-d">새 공간을 엽니다</span>
+        </button>
+        <button class="pick-card" id="goJoin">
+          <span class="pick-ico">🚪</span>
+          <span class="pick-t">참여하기</span>
+          <span class="pick-d">초대 코드로 입장</span>
+        </button>
+      </div>
     </div>
 
-    <button id="enter" disabled>입장하기</button>
-    <p class="err" id="lobbyErr"></p>
+    <!-- 2단계: 캐릭터 · 닉네임 (+ 코드) -->
+    <div class="step hidden" id="step2">
+      <button class="backBtn" id="back" title="뒤로">←</button>
+      <h1 id="step2Title">방 만들기</h1>
+
+      <!-- 만들기: 발급된 코드 -->
+      <div class="codebox hidden" id="newCodeBox">
+        <span class="codebox-label">초대 코드</span>
+        <span class="codebox-code" id="newCode">······</span>
+        <button class="mini" id="copyNewCode">복사</button>
+      </div>
+
+      <!-- 참여: 코드 입력 -->
+      <div class="room-row hidden" id="roomRow">
+        <input id="roomCode" placeholder="초대 코드 6자리" maxlength="6"
+               autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <p class="roomStat" id="roomStat"></p>
+      </div>
+
+      <p class="sub" id="pickSub">캐릭터와 닉네임을 고르세요</p>
+      <div class="char-grid" id="charGrid"></div>
+      <input id="nick" placeholder="닉네임" maxlength="10" autocomplete="off">
+
+      <button id="enter" disabled>입장하기</button>
+      <p class="err" id="lobbyErr"></p>
+    </div>
   </div>
 </div>
 
@@ -36,17 +69,31 @@
     <span id="roomLabel">공간</span>
     <span class="avs" id="avs"></span>
     <button class="mini" id="copyInvite">초대코드 복사</button>
+    <button class="mini ghost" id="logBtn">대화보기<span class="badge hidden" id="logBadge">0</span></button>
     <button class="mini ghost" id="quitBtn">나가기</button>
   </div>
 
   <!-- 캐릭터들이 그려지는 레이어 (배경은 클릭 통과) -->
   <div id="stage"></div>
 
+  <!-- 대화 기록 패널 : 인터랙션 영역 -->
+  <div id="chatlog" class="interactive hidden">
+    <div class="log-head">
+      <span id="logTitle">대화 내용</span>
+      <button id="logClose" class="log-x" title="닫기">×</button>
+    </div>
+    <div class="log-body" id="logBody"></div>
+    <div class="log-empty" id="logEmpty">아직 대화가 없어요</div>
+  </div>
+
   <!-- 입력창 : 인터랙션 영역 -->
   <div id="inputBox" class="interactive"><input id="chatInput" placeholder="입력 후 Enter" maxlength="80" autocomplete="off"></div>
 
-  <div class="hint">내 캐릭터는 드래그로 이동 · 클릭하면 입력 · ⌘/Ctrl+Shift+Space 로 숨김</div>
+  <div class="hint">드래그로 이동 · Enter 또는 클릭으로 입력 · ⌘/Ctrl+Shift+Enter 로 어디서든 입력 · ⌘/Ctrl+Shift+Space 로 숨김</div>
 </div>
+
+<!-- 종료 확인 등 짧은 안내 -->
+<div id="toast" class="toast"></div>
 
 <script type="module" src="app.js"></script>
 </body>
