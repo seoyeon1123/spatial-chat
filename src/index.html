@@ -87,9 +87,9 @@
   </div>
 
   <!-- 입력창 : 인터랙션 영역 -->
-  <div id="inputBox" class="interactive"><input id="chatInput" placeholder="입력 후 Enter" maxlength="80" autocomplete="off"></div>
+  <div id="inputBox" class="interactive"><textarea id="chatInput" rows="1" placeholder="입력 후 Enter" maxlength="80" autocomplete="off" spellcheck="false"></textarea></div>
 
-  <div class="hint">드래그로 이동 · Enter 또는 클릭으로 입력 · ⌘/Ctrl+Shift+Enter 로 어디서든 입력 · ⌘/Ctrl+Shift+Space 로 숨김</div>
+  <div class="hint" id="hint"></div>
 </div>
 
 <!-- 종료 확인 등 짧은 안내 -->

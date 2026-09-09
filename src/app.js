@@ -381,8 +381,18 @@ async function join() {
   startOverlay();
 }
 
+// 하단 안내 — 플랫폼에 맞는 표기로 짧게, 처음에만
+function showHint() {
+  const el = $("#hint");
+  if (!el) return;
+  const mac = navigator.platform.toUpperCase().includes("MAC");
+  el.textContent = `드래그 이동 · Enter 입력 · ${mac ? "⌘⇧Space" : "Ctrl+Shift+Space"} 숨기기`;
+  setTimeout(() => el.classList.add("gone"), 9000);
+}
+
 // ====== 오버레이 시작 ======
 function startOverlay() {
+  showHint();
   lobby.classList.add("hidden");
   overlay.classList.remove("hidden");
   $("#roomLabel").textContent = `공간 · ${roomCode}`;
@@ -514,31 +524,78 @@ function positionInput(a) {
   let cx = r.left + r.width / 2;
   cx = Math.min(Math.max(cx, half + EDGE), window.innerWidth - half - EDGE);
 
-  let top = r.top - h - 8;                                  // 기본은 머리 위
-  if (top < EDGE) top = r.bottom + 8;                       // 위가 좁으면 발 밑으로
-  top = Math.min(top, window.innerHeight - h - EDGE);
+  // 기본은 발 밑. 머리 위에 두면 말풍선·이름표와 시선이 엉키고,
+  // 타이핑하는 동안 캐릭터가 가려진다.
+  let top = r.bottom + 8;
+  if (top + h > window.innerHeight - EDGE) top = r.top - h - 8;   // 아래가 좁으면 머리 위로
+  top = Math.max(EDGE, Math.min(top, window.innerHeight - h - EDGE));
 
   inputBox.style.left = cx + "px";
   inputBox.style.top = top + "px";
 }
 
+// 입력 내용에 맞춰 높이를 늘린다. 한 줄에 가둬두면 긴 문장의 앞부분이 밀려 안 보인다.
+function autoGrow() {
+  chatInput.style.height = "auto";
+  // box-sizing:border-box라 height에 테두리가 포함된다.
+  // scrollHeight(테두리 제외)만 넣으면 딱 테두리 두께만큼 모자라 스크롤이 생긴다.
+  const border = chatInput.offsetHeight - chatInput.clientHeight;
+  chatInput.style.height = (chatInput.scrollHeight + border) + "px";
+}
+
 function openInput(a, id) {
   current = { a, id };
   inputBox.style.display = "block";   // 크기를 재려면 먼저 보이게 해야 한다
+  chatInput.value = "";
+  autoGrow();
   positionInput(a);
-  chatInput.value = ""; chatInput.focus();
+  chatInput.focus();
 }
-function hideInput() { inputBox.style.display = "none"; current = null; }
+function hideInput() {
+  inputBox.style.display = "none";
+  chatInput.value = "";
+  chatInput.style.height = "auto";
+  current = null;
+}
 
+// 줄이 늘면 입력창이 커지므로 캐릭터 위 위치를 다시 잡아준다
+chatInput.addEventListener("input", () => {
+  autoGrow();
+  if (current) positionInput(current.a);
+});
+
+function submitChat() {
+  const text = chatInput.value.trim();
+  if (!text || !current) return;
+  sendMessage(text);
+  hideInput();
+}
+
+// 한글 조합 중의 Enter는 마지막 글자를 확정하는 키라 그 시점에 보내면 글자가 잘린다.
+// 그렇다고 무시만 하면 한글은 Enter를 두 번 눌러야 하고 영어는 한 번이라 동작이 엇갈린다.
+// 그래서 확정을 기다렸다가(compositionend) 이어서 보낸다 — 양쪽 모두 Enter 한 번이다.
+let enterWhileComposing = false;
+chatInput.addEventListener("compositionend", () => {
+  if (!enterWhileComposing) return;
+  enterWhileComposing = false;
+  submitChat();
+});
 chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") return hideInput();
-  // 한글 조합 중 Enter는 마지막 글자를 확정하는 키다. 여기서 걸러내지 않으면
-  // "안녕"의 '녕'이 조합되는 중에 전송돼서 글자가 잘리거나 두 번 눌러야 한다.
-  if (e.isComposing || e.keyCode === 229) return;
-  if (e.key === "Enter" && chatInput.value.trim() && current) {
-    sendMessage(chatInput.value.trim());
+  if (e.key === "Escape") {
+    // 여기서 멈추지 않으면 document의 Esc 핸들러까지 올라간다. 그때는 입력창이
+    // 이미 닫힌 뒤라 "종료 확인"이 켜지고, 다음 Esc 한 번에 앱이 꺼진다.
+    e.stopPropagation();
     hideInput();
+    return;
   }
+  if (e.key !== "Enter") { enterWhileComposing = false; return; }
+
+  if (e.isComposing || e.keyCode === 229) {
+    enterWhileComposing = true;       // 확정만 시키고, compositionend에서 보낸다
+    return;                            // preventDefault 하면 IME 확정을 방해할 수 있다
+  }
+  e.preventDefault();                  // textarea 기본 동작(줄바꿈) 차단
+  submitChat();
 });
 
 let bubbleToken = 0;
@@ -696,8 +753,19 @@ function showBubble(a, text) {
   b.textContent = text;
   // 화면 오른쪽 끝이면 왼쪽으로 뒤집기
   const r = a.el.getBoundingClientRect();
-  if (r.right + 250 > window.innerWidth) b.classList.add("left");
+  if (r.right + 290 > window.innerWidth) b.classList.add("left");
   a.el.appendChild(b);
+
+  // 긴 문장은 말풍선이 높아져 화면 밖으로 나간다. 화면 안으로 붙잡는다.
+  const br = b.getBoundingClientRect();
+  let top = br.top;
+  if (br.bottom > window.innerHeight - EDGE) top = window.innerHeight - EDGE - br.height;
+  if (top < EDGE) top = EDGE;
+  if (Math.abs(top - br.top) > 0.5) {
+    b.classList.add("pinned");
+    b.style.top = (top - r.top) + "px";
+  }
+
   a._bubbleUntil = Date.now() + BUBBLE_MS;
 }
 function tickBubbles() {

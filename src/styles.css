@@ -140,10 +140,13 @@ html, body {
 .bubble {
   position:absolute; left:100%; top:50%; transform:translateY(-50%) translateX(10px);
   background:#fff; color:#1a1a1a; padding:8px 12px; border-radius:14px; font-size:13px;
-  max-width:220px; width:max-content; text-align:left;
+  max-width:260px; width:max-content; text-align:left; white-space:pre-wrap; word-break:break-word;
   box-shadow:0 6px 18px rgba(0,0,0,.35); animation:pop .18s ease-out;
 }
 .bubble.left { left:auto; right:100%; transform:translateY(-50%) translateX(-10px); }
+/* 화면 위아래로 넘칠 때는 top을 직접 지정하므로 세로 정렬 변형을 뺀다 */
+.bubble.pinned { transform:translateX(10px); }
+.bubble.left.pinned { transform:translateX(-10px); }
 .bubble::after {
   content:""; position:absolute; right:100%; top:50%; transform:translateY(-50%);
   border:7px solid transparent; border-right-color:#fff;
@@ -153,16 +156,25 @@ html, body {
 
 /* 입력창 */
 #inputBox { position:absolute; transform:translate(-50%,0); z-index:35; display:none; }
-#inputBox input {
-  padding:10px 14px; width:210px; border-radius:20px; border:2px solid #7c6cff; outline:none;
-  background:#fff; color:#111; font-size:14px; box-shadow:0 8px 24px rgba(0,0,0,.4);
+/* 한 줄 input이면 긴 문장의 앞부분이 왼쪽으로 밀려 보이지 않는다.
+   textarea로 두고 입력에 맞춰 높이를 늘려 전체가 보이게 한다. */
+#inputBox textarea {
+  display:block; width:300px; max-height:126px;      /* 6줄쯤에서 멈추고 스크롤 */
+  padding:9px 14px; border-radius:16px; border:2px solid #7c6cff; outline:none;
+  background:#fff; color:#111; font-family:inherit; font-size:14px; line-height:1.45;
+  resize:none; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.4);
+  word-break:break-word;
 }
+#inputBox textarea::-webkit-scrollbar { width:5px; }
+#inputBox textarea::-webkit-scrollbar-thumb { background:rgba(0,0,0,.2); border-radius:3px; }
 
 .hint {
   position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:20;
   font-size:12px; color:#fff; background:rgba(20,20,30,.55); padding:7px 16px; border-radius:20px;
-  pointer-events:none;
+  pointer-events:none; transition:opacity .6s;
 }
+/* 처음에만 필요한 안내라 잠시 뒤 사라진다 */
+.hint.gone { opacity:0; }
 
 /* 짧은 안내 토스트 (Esc 종료 확인 등) */
 .toast {
