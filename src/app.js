@@ -506,6 +506,9 @@ function hideInput() { inputBox.style.display = "none"; current = null; }
 
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") return hideInput();
+  // 한글 조합 중 Enter는 마지막 글자를 확정하는 키다. 여기서 걸러내지 않으면
+  // "안녕"의 '녕'이 조합되는 중에 전송돼서 글자가 잘리거나 두 번 눌러야 한다.
+  if (e.isComposing || e.keyCode === 229) return;
   if (e.key === "Enter" && chatInput.value.trim() && current) {
     sendMessage(chatInput.value.trim());
     hideInput();
