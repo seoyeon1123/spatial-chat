@@ -63,6 +63,9 @@ function setIgnore(v) {
 }
 document.addEventListener("mousemove", (e) => {
   if (dragging) { setIgnore(false); return; }
+  // 입력 중에는 통과를 잠근다. 안 그러면 바깥을 클릭해도 그 클릭이 뒤의 앱으로
+  // 가버려서, 입력창을 닫을 방법이 Esc밖에 남지 않는다.
+  if (inputOpen) { setIgnore(false); return; }
   const hit = e.target.closest(".interactive, .actor, #inputBox, #lobby");
   setIgnore(!hit);
 });
@@ -266,7 +269,7 @@ let quitArmedUntil = 0;
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (viewerOpen) { closeViewer(); return; }
-  if (inputBox.style.display === "block") { hideInput(); return; }
+  if (inputOpen) { hideInput(); return; }
   if (logOpen) { toggleLog(false); return; }
 
   if (Date.now() < quitArmedUntil) { quitApp(); return; }
@@ -279,7 +282,7 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || e.isComposing) return;
   if (!overlay || overlay.classList.contains("hidden")) return;   // 아직 로비
-  if (inputBox.style.display === "block") return;                 // 이미 열려 있음
+  if (inputOpen) return;                                          // 이미 열려 있음
   const t = e.target;
   if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
   e.preventDefault();
@@ -297,7 +300,7 @@ function focusChat() {
 // 다른 앱에 포커스가 있을 때: ⌘/Ctrl+Shift+Enter → 창을 띄우고 바로 입력
 window.overlay?.onFocusChat(() => {
   if (!overlay || overlay.classList.contains("hidden")) return;
-  if (inputBox.style.display === "block") { chatInput.focus(); return; }
+  if (inputOpen) { chatInput.focus(); return; }
   focusChat();
 });
 
@@ -386,6 +389,16 @@ async function join() {
 
   startOverlay();
 }
+
+// 입력창 바깥을 클릭하면 닫는다
+document.addEventListener("pointerdown", (e) => {
+  if (!inputOpen) return;
+  if (inputBox.contains(e.target)) return;
+  hideInput();
+}, true);
+
+// 다른 앱으로 넘어가면 닫는다. 떠 있는 채로 남으면 바탕화면을 계속 가린다.
+window.addEventListener("blur", () => { if (inputOpen) hideInput(); });
 
 // 하단 안내 — 플랫폼에 맞는 표기로 짧게, 처음에만
 function showHint() {
@@ -551,19 +564,36 @@ function autoGrow() {
   chatInput.style.height = (chatInput.scrollHeight + border) + "px";
 }
 
+// display를 바로 끄면 사라지는 게 안 보인다. 전환이 끝난 뒤에 끄고,
+// 그 사이 다시 열리면 취소한다.
+let inputOpen = false, closeTimer = null;
+
 function openInput(a, id) {
   current = { a, id };
+  inputOpen = true;
+  clearTimeout(closeTimer);
   inputBox.style.display = "block";   // 크기를 재려면 먼저 보이게 해야 한다
   chatInput.value = "";
   autoGrow();
   positionInput(a);
+  void inputBox.offsetWidth;          // 전환이 첫 프레임부터 돌도록 강제 반영
+  inputBox.classList.add("on");
   chatInput.focus();
 }
+
 function hideInput() {
-  inputBox.style.display = "none";
-  chatInput.value = "";
-  chatInput.style.height = "auto";
+  if (!inputOpen) return;
+  inputOpen = false;
   current = null;
+  inputBox.classList.remove("on");
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => {
+    if (inputOpen) return;            // 그 사이 다시 열렸으면 그대로 둔다
+    inputBox.style.display = "none";
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+    setIgnore(true);                  // 잠가뒀던 클릭 통과를 되돌린다
+  }, 160);
 }
 
 // 줄이 늘면 입력창이 커지므로 캐릭터 위 위치를 다시 잡아준다
@@ -1001,5 +1031,5 @@ function randomCode() {
 // (예전엔 다음 onValue를 기다렸는데, 아무도 안 움직이면 영영 어긋난 채로 남았다)
 window.addEventListener("resize", () => {
   Object.values(actorEls).forEach(placeActor);
-  if (inputBox.style.display === "block" && current) positionInput(current.a);
+  if (inputOpen && current) positionInput(current.a);
 });

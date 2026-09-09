@@ -41,6 +41,18 @@ function createWindow() {
   // forward:true 라서 통과 상태에서도 마우스 이동 이벤트는 계속 받는다.
   win.setIgnoreMouseEvents(false, { forward: true });
 
+  // 개발 중 새로고침 (Cmd/Ctrl+R). Electron은 소스가 바뀌어도 다시 읽지 않아
+  // 고칠 때마다 앱을 껐다 켜야 했다.
+  // globalShortcut을 쓰면 다른 앱의 ⌘R까지 삼켜 브라우저 새로고침이 막히므로,
+  // 이 창에 포커스가 있을 때만 들어오는 before-input-event를 쓴다.
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.key.toLowerCase() !== 'r') return;
+    if (!(input.meta || input.control)) return;
+    e.preventDefault();
+    win.webContents.reloadIgnoringCache();
+  });
+
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
 
   // win.webContents.openDevTools({ mode: 'detach' }); // 디버깅 시
